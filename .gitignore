@@ -1,3 +1,6 @@
 node_modules/
 __pycache__/
 storage/
+myenv/
+credentials.txt
+cloud-crypt-457410-c5d430f22292.json

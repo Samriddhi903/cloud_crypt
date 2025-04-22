@@ -1,11 +1,21 @@
 import bcrypt
 
+# For manager1
+password = 'manager123'
+hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(12))
+with open('credentials.txt', 'w') as f:
+    f.write(f"manager1:{hashed.decode('utf-8')}\n")
+
+# For boss
 password = 'boss123'
 hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(12))
-print(f"Password: {password}")
-print(f"Generated hash: {hashed.decode('utf-8')}")
+with open('credentials.txt', 'a') as f:
+    f.write(f"boss:{hashed.decode('utf-8')}\n")
 
-# Verify the hash
-stored_hash = '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY.0DQJbG7.gsYe'
-print(f"\nVerifying against stored hash: {stored_hash}")
-print(f"Verification result: {bcrypt.checkpw(password.encode('utf-8'), stored_hash.encode('utf-8'))}")
+# For user1
+password = 'user123'
+hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(12))
+with open('credentials.txt', 'a') as f:
+    f.write(f"user1:{hashed.decode('utf-8')}\n")
+
+print("Default credentials generated in credentials.txt")
