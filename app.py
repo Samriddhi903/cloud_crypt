@@ -7,7 +7,7 @@ import io
 from datetime import datetime
 from werkzeug.utils import secure_filename
 import bcrypt
-
+import logging
 # Initialize access request manager first (needs to be available globally)
 access_request_manager = AccessRequestManager()
 
@@ -281,12 +281,15 @@ def storage_info():
 def refresh_files():
     if 'username' not in session:
         return redirect(url_for('login'))
-    
+    logger = logging.getLogger(__name__)
     try:
         # Force a refresh of files from cloud storage
         if file_storage.use_cloud and file_storage.bucket:
             blobs = list(file_storage.bucket.list_blobs())
             all_metadata = file_storage.load_metadata()
+            
+            # Create set of cloud files (excluding metadata.json)
+            cloud_files = set(blob.name for blob in blobs if blob.name != 'metadata.json')
             
             # Update metadata with files from cloud
             updated = False
@@ -297,18 +300,40 @@ def refresh_files():
                         filename=blob.name,
                         owner=session['username'],  # Assign to current user
                         encrypted_key="",  # This needs special handling
-                        created_at=blob.time_created.isoformat()
+                        created_at=blob.time_created.isoformat() if hasattr(blob, 'time_created') else datetime.now().isoformat()
                     ).to_dict()
                     updated = True
             
+            # Remove files from metadata that don't exist in cloud
+            metadata_files = set(all_metadata.keys())
+            files_to_remove = metadata_files - cloud_files
+            
+            removed_files = False
+            for filename in files_to_remove:
+                if filename in all_metadata:
+                    logger.info(f"Removing {filename} from metadata as it no longer exists in cloud")
+                    del all_metadata[filename]
+                    updated = True
+                    removed_files = True
+                    
+                    # Also remove local copy if it exists
+                    file_path = file_storage.storage_dir / filename
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                        logger.info(f"Removed local copy of {filename}")
+            
             if updated:
                 file_storage.save_metadata(all_metadata)
-                flash('File list refreshed from cloud storage', 'success')
+                if removed_files:
+                    flash('File list updated: added new files and removed files no longer in cloud storage', 'success')
+                else:
+                    flash('File list refreshed from cloud storage', 'success')
             else:
-                flash('No new files found in cloud storage', 'info')
+                flash('No changes needed - file list is already in sync with cloud storage', 'info')
         else:
             flash('Cloud storage is not enabled', 'warning')
     except Exception as e:
+        logger.error(f"Error refreshing files: {e}")
         flash(f'Error refreshing files: {str(e)}', 'error')
     
     return redirect(url_for('index'))

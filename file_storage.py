@@ -344,6 +344,9 @@ class FileStorage:
 
     def sync_with_cloud(self) -> bool:
         """Synchronize local metadata with cloud storage bucket contents"""
+        # Logger should be defined at the class level, but we'll ensure it's accessible
+        logger = logging.getLogger(__name__)
+        
         if not self.use_cloud or not self.bucket:
             logger.warning("Cloud storage not enabled, cannot sync")
             return False
@@ -368,6 +371,9 @@ class FileStorage:
             # List all blobs in the bucket
             blobs = list(self.bucket.list_blobs())
             
+            # Get list of files in cloud (excluding metadata.json)
+            cloud_files = set(blob.name for blob in blobs if blob.name != 'metadata.json')
+            
             # Check for files in cloud that aren't in metadata
             updated = False
             for blob in blobs:
@@ -382,9 +388,24 @@ class FileStorage:
                         filename=blob.name,
                         owner="unknown",  # You might want to handle this differently
                         encrypted_key="",  # This will need to be handled for decryption
-                        created_at=blob.time_created.isoformat() if hasattr(blob, 'time_created') else datetime.now().isoformat()
+                        created_at=blob.time_created.isoformat() if hasattr(blob, 'time_created') else datetime.datetime.now().isoformat()
                     ).to_dict()
                     updated = True
+            
+            # Now check for files in metadata that no longer exist in cloud
+            metadata_files = set(all_metadata.keys())
+            files_to_remove = metadata_files - cloud_files
+            
+            for filename in files_to_remove:
+                logger.info(f"File {filename} exists in metadata but not in cloud, removing from metadata")
+                del all_metadata[filename]
+                updated = True
+                
+                # Also remove local copy if it exists
+                file_path = self.storage_dir / filename
+                if file_path.exists():
+                    os.remove(file_path)
+                    logger.info(f"Removed local copy of {filename} that no longer exists in cloud")
             
             # Save updated metadata if changes were made
             if updated:
@@ -392,7 +413,7 @@ class FileStorage:
                 logger.info("Metadata synchronized with cloud storage")
                 return True
             else:
-                logger.info("No new files found in cloud storage")
+                logger.info("No changes needed during cloud synchronization")
                 return False
         except Exception as e:
             logger.error(f"Error syncing with cloud: {e}")
