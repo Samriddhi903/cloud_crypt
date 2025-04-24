@@ -40,7 +40,7 @@ class AccessRequest:
         )
 
 class AccessRequestManager:
-    def __init__(self, storage_path: str = "access_requests.json"):
+    def __init__(self, storage_path: str = "storage/access_requests.json"):
         self.storage_path = storage_path
         self.requests: Dict[str, AccessRequest] = {}
         self.load_requests()

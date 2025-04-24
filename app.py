@@ -12,13 +12,13 @@ import logging
 access_request_manager = AccessRequestManager()
 
 app = Flask(__name__)
-app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-super-secret-key')  # Better to use env var
+app.secret_key = os.getenv('FLASK_SECRET_KEY')  # Better to use env var
 
 # Get cloud storage configuration from environment variables
 use_cloud = os.getenv('USE_CLOUD_STORAGE', 'false').lower() == 'true'
 bucket_name = os.getenv('CLOUD_STORAGE_BUCKET')
 credentials_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
-
+change_made=os.getenv("CHANGE_MADE","1")
 # Initialize services
 file_storage = FileStorage(
     use_cloud=use_cloud,
@@ -27,7 +27,7 @@ file_storage = FileStorage(
 )
 encryption_service = EncryptionService(file_storage=file_storage)
 encryption_service.set_access_request_manager(access_request_manager)
-if file_storage.use_cloud:
+if change_made=="1" and file_storage.use_cloud:
     file_storage.sync_with_cloud()
 
 def register_existing_files_with_encryption_service():
@@ -61,21 +61,6 @@ def load_credentials():
                     credentials[username] = hashed_password
     except Exception as e:
         print(f"Error loading credentials: {e}")
-        # Add default credentials for testing
-        credentials = {
-            "boss": bcrypt.hashpw("boss123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'),
-            "manager1": bcrypt.hashpw("manager123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'),
-            "user1": bcrypt.hashpw("user123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'),
-            "user2": bcrypt.hashpw("user123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        }
-        # Save default credentials
-        try:
-            with open('credentials.txt', 'w') as f:
-                for username, password in credentials.items():
-                    f.write(f"{username}:{password}\n")
-        except Exception as e:
-            print(f"Error saving default credentials: {e}")
-    
     return credentials
 
 @app.route('/')
@@ -716,4 +701,4 @@ def load_credentials():
     return credentials
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=os.getenv('FLASK_DEBUG', 'false').lower() == 'true')
